@@ -1,3 +1,6 @@
+package com.example.vamonosrecio
+
+import MainScreen
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -13,15 +16,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            // Es buena práctica envolver tu app en un tema.
-            // YourAppTheme {
-            Surface(
-                modifier = Modifier.fillMaxSize(),
-                color = MaterialTheme.colorScheme.background
-            ) {
-                MainScreen() // <-- Aquí llamas a tu pantalla
-            }
-            // }
+            MainScreen() // 👈 tu Composable principal
         }
     }
 }

@@ -3,7 +3,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
-    id("com.google.devtools.ksp") version "2.0.0-1.0.22"
+    id("com.google.devtools.ksp") version "2.0.21-1.0.25"
 }
 
 android {
@@ -67,13 +67,15 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
 
-    // Necesario para los íconos (search, map, notifications, person)
-    //implementation(libs.androidx.compose.material.icons.extended)
+    // --- Google Maps Compose ---
+    implementation("com.google.maps.android:maps-compose:4.4.1")
 
-    // Librería para integrar Google Maps en Compose
-    //implementation(libs.maps.compose)
-    // Librería para los servicios de ubicación de Google
-    //implementation(libs.play.services.location)
+// --- Google Play Services: Location ---
+    implementation("com.google.android.gms:play-services-location:21.3.0")
+
+// --- Material Icons (para los íconos del BottomNavigation) ---
+    implementation("androidx.compose.material:material-icons-extended")
+
     implementation("com.google.android.gms:play-services-maps:18.1.0")
 
     //Conexion con la base de datos
