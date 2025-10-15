@@ -70,12 +70,13 @@ dependencies {
     implementation(libs.androidx.material3)
 
     // Necesario para los íconos (search, map, notifications, person)
-    implementation(libs.androidx.compose.material.icons.extended)
+    //implementation(libs.androidx.compose.material.icons.extended)
 
     // Librería para integrar Google Maps en Compose
-    implementation(libs.maps.compose)
+    //implementation(libs.maps.compose)
     // Librería para los servicios de ubicación de Google
-    implementation(libs.play.services.location)
+    //implementation(libs.play.services.location)
+    implementation("com.google.android.gms:play-services-maps:18.1.0")
 
     //Conexion con la base de datos
     val room_version = "2.6.1"
