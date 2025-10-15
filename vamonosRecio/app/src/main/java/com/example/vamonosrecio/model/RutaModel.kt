@@ -3,7 +3,7 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 
 @Entity(tableName = "RUTA")
-data class Ruta(
+data class RutaModel(
     @PrimaryKey(autoGenerate = true)
     @ColumnInfo(name = "ID_RUTA")
     val id: Int = 0,
