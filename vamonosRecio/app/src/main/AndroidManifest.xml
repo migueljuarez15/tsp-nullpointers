@@ -21,11 +21,9 @@
             android:theme="@style/Theme.VamonosRecio">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <meta-data android:name="com.google.android.geo.API_KEY" android:value="AIzaSyDkcaTrFPn2PafDX85VmT-XEKS2qnk7oe8" />
         </activity>
+        <meta-data android:name="com.google.android.geo.API_KEY" android:value="AIzaSyDkcaTrFPn2PafDX85VmT-XEKS2qnk7oe8" />
     </application>
-
 </manifest>
