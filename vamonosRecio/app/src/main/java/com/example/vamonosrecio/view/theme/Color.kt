@@ -1,4 +1,4 @@
-package com.example.vamonosrecio.ui.theme
+package com.example.vamonosrecio.view.theme
 
 import androidx.compose.ui.graphics.Color
 
