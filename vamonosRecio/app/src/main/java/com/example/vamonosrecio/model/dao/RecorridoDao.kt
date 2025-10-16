@@ -6,6 +6,6 @@ import com.example.vamonosrecio.model.RecorridoModel
 
 @Dao
 interface RecorridoDao {
-    @Query("SELECT * FROM RECORRIDO WHERE ID_RUTA = :rutaId")
+    @Query("SELECT rowid, * FROM RECORRIDO WHERE ID_RUTA = :rutaId ORDER BY rowid ASC")
     suspend fun getRecorridoByRuta(rutaId: Int): List<RecorridoModel>
 }

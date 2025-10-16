@@ -28,6 +28,7 @@ import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.*
 import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.model.LatLngBounds
 
 // --- DATA CLASS ---
 data class BottomNavItem(
@@ -37,7 +38,7 @@ data class BottomNavItem(
 
 // --- MAIN SCREEN ---
 @Composable
-fun MainScreen(db: AppDatabase, onMenuClick: () -> Unit) {
+fun MainScreen(db: AppDatabase, onMenuClick: () -> Unit, routeId: Int? = null) {
     Scaffold(
         topBar = { CustomTopBar(onMenuClick = onMenuClick) },
         bottomBar = { CustomBottomNavBar() },
@@ -48,7 +49,7 @@ fun MainScreen(db: AppDatabase, onMenuClick: () -> Unit) {
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            MyMapComponent(db)
+            MyMapComponent(db, routeId)
         }
     }
 }
@@ -56,41 +57,35 @@ fun MainScreen(db: AppDatabase, onMenuClick: () -> Unit) {
 // --- GOOGLE MAP COMPONENT ---
 @SuppressLint("MissingPermission")
 @Composable
-fun MyMapComponent(db: AppDatabase) {
+fun MyMapComponent(db: AppDatabase, routeId: Int?) {
     val context = LocalContext.current
     val fusedLocationProviderClient = remember { LocationServices.getFusedLocationProviderClient(context) }
 
+    // 📍 Coordenadas por defecto (Zacatecas - Guadalupe)
     val zacatecas = LatLng(22.7709, -102.5833)
     var deviceLocation by remember { mutableStateOf<LatLng?>(null) }
 
-    // Cargar las paradas desde la base de datos
-    val paradas by produceState<List<ParadaModel>>(initialValue = emptyList()) {
+    // Cargar paradas desde la BD
+    val paradas by produceState(initialValue = emptyList<ParadaModel>()) {
         value = db.paradaDao().getAllParadas()
+        println("🔹 Se cargaron ${value.size} paradas desde la base de datos")
     }
 
+    // Estado de la cámara
     val cameraPositionState = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(zacatecas, 12f)
+        position = CameraPosition.fromLatLngZoom(zacatecas, 13f)
     }
 
+    // 🚨 Permisos de ubicación
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        if (permissions.getOrDefault(Manifest.permission.ACCESS_FINE_LOCATION, false) ||
-            permissions.getOrDefault(Manifest.permission.ACCESS_COARSE_LOCATION, false)
-        ) {
+        if (permissions.getOrDefault(Manifest.permission.ACCESS_FINE_LOCATION, false)) {
             fusedLocationProviderClient.lastLocation
                 .addOnSuccessListener { location ->
-                    if (location != null) {
-                        val newLatLng = LatLng(location.latitude, location.longitude)
-
-                        // ✅ Solo actualiza si está dentro de México (rango aproximado)
-                        val isInMexico = location.latitude in 14.0..33.0 &&
-                                location.longitude in -118.0..-86.0
-
-                        deviceLocation = if (isInMexico) newLatLng else zacatecas
-                    } else {
-                        deviceLocation = zacatecas
-                    }
+                    deviceLocation = if (location != null) {
+                        LatLng(location.latitude, location.longitude)
+                    } else zacatecas
                 }
                 .addOnFailureListener {
                     deviceLocation = zacatecas
@@ -100,6 +95,7 @@ fun MyMapComponent(db: AppDatabase) {
         }
     }
 
+    // Lanzar permisos una vez
     LaunchedEffect(Unit) {
         locationPermissionLauncher.launch(
             arrayOf(
@@ -109,31 +105,56 @@ fun MyMapComponent(db: AppDatabase) {
         )
     }
 
-    // Mueve la cámara solo cuando ya hay una ubicación
+    // Centrar cámara inicial
     LaunchedEffect(deviceLocation) {
-        val target = deviceLocation ?: zacatecas
         cameraPositionState.animate(
-            CameraUpdateFactory.newLatLngZoom(target, 14f)
+            CameraUpdateFactory.newLatLngZoom(deviceLocation ?: zacatecas, 13f)
         )
     }
 
+    // 📐 Limitar área visible del mapa (Zacatecas - Guadalupe)
+    val zacatecasBounds = LatLngBounds(
+        LatLng(22.6000, -102.8000), // suroeste — un poco más abajo y a la izquierda
+        LatLng(22.9000, -102.4000)  // noreste — un poco más arriba y a la derecha
+    )
+
+    // --- Mapa ---
     GoogleMap(
         modifier = Modifier.fillMaxSize(),
-        cameraPositionState = cameraPositionState
-    ) {
-        // Marcador para la ubicación del usuario
-        Marker(
-            state = MarkerState(position = deviceLocation ?: zacatecas),
-            title = if (deviceLocation != null) "Mi Ubicación" else "Zacatecas"
+        cameraPositionState = cameraPositionState,
+        properties = MapProperties(
+            isMyLocationEnabled = deviceLocation != null,
+            latLngBoundsForCameraTarget = zacatecasBounds,
+            minZoomPreference = 12f,
+            maxZoomPreference = 18f
         )
-
-        // Marcadores para cada parada de autobús
-        paradas.forEach { parada ->
+    ) {
+        // 📍 Ubicación del usuario
+        deviceLocation?.let {
             Marker(
-                state = MarkerState(position = LatLng(parada.latitud, parada.longitud)),
-                title = parada.nombre,
-                icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)
+                state = MarkerState(it),
+                title = "Mi ubicación"
             )
+        }
+
+        // 🔵 Dibujar círculos de paradas según el nivel de zoom
+        val zoom = cameraPositionState.position.zoom
+        val step = when {
+            zoom > 17 -> 1
+            zoom > 15 -> 3
+            zoom > 13 -> 6
+            else -> 0 // No se muestran puntos si el zoom es bajo
+        }
+
+        if (step > 0) {
+            paradas.filterIndexed { index, _ -> index % step == 0 }.forEach { parada ->
+                Circle(
+                    center = LatLng(parada.latitud, parada.longitud),
+                    radius = 10.0,
+                    strokeColor = Color(0xFF1565C0),
+                    fillColor = Color(0x441565C0)
+                )
+            }
         }
     }
 }

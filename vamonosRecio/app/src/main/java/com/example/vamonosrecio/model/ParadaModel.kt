@@ -6,7 +6,7 @@ import androidx.room.PrimaryKey
 
 @Entity(tableName = "PARADAS")
 data class ParadaModel(
-    @PrimaryKey @ColumnInfo(name = "ID_PARADA") val id: Int,
+    @PrimaryKey @ColumnInfo(name = "ID_PARADA") val id: Int = 0,
     @ColumnInfo(name = "NOMBRE") val nombre: String,
     @ColumnInfo(name = "LATITUD") val latitud: Double,
     @ColumnInfo(name = "LONGITUD") val longitud: Double

@@ -10,7 +10,7 @@ import com.example.vamonosrecio.model.dao.RecorridoDao
 import com.example.vamonosrecio.model.dao.RutaDao
 
 
-@Database(entities = [RutaModel::class, ParadaModel::class, RecorridoModel::class], version = 5, exportSchema = false) // <-- VERSIÓN INCREMENTADA A 5
+@Database(entities = [RutaModel::class, ParadaModel::class, RecorridoModel::class], version = 6, exportSchema = false) // <-- VERSIÓN INCREMENTADA A 6
 abstract class AppDatabase : RoomDatabase() {
     abstract fun rutaDao(): RutaDao
     abstract fun paradaDao(): ParadaDao
