@@ -49,7 +49,6 @@ fun getRouteStyle(ruta: RutaModel): RouteStyle {
 fun ListaRutaView(db: AppDatabase, onBack: () -> Unit, onRouteClick: (RutaModel) -> Unit) {
 
     // --- PRUEBA: Usando una lista harcoded --- 
-    /*
     val rutas = listOf(
         RutaModel(1, "Ruta 1", "", "", ""),
         RutaModel(2, "Ruta 2", "", "", ""),
@@ -63,13 +62,11 @@ fun ListaRutaView(db: AppDatabase, onBack: () -> Unit, onRouteClick: (RutaModel)
         RutaModel(21, "Transportes de Guadalupe", "", "", "")
     )
 
-     */
-
-    //--- CÓDIGO REAL (COMENTADO TEMPORALMENTE) ---
+    /*//--- CÓDIGO REAL (COMENTADO TEMPORALMENTE) ---
     // Cargar las rutas desde la base de datos
     val rutas by produceState<List<RutaModel>>(initialValue = emptyList(), producer = {
         value = db.rutaDao().getAllRutas()
-    })
+    })*/
 
     Scaffold(
         topBar = {

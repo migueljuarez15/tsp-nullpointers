@@ -23,8 +23,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.vamonosrecio.db.AppDatabase
 import com.example.vamonosrecio.model.ParadaModel
-import com.example.vamonosrecio.model.HorarioModel
-import com.example.vamonosrecio.utils.decodePolyline
+import com.example.vamonosrecio.model.LatLngData
+import com.example.vamonosrecio.utils.fetchRouteWithOSRM
+import com.example.vamonosrecio.utils.getRutaColor
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
@@ -72,24 +73,17 @@ fun MyMapComponent(db: AppDatabase, routeId: Int?) {
         println("🔵 Se cargaron ${value.size} paradas")
     }
 
-    // AQUI SE PONE LAS COORDENADAS PARA HACER EL RECORRIDO
-    // Deshabilitado por mientras
-    /*val coordenadasRuta by produceState(initialValue = emptyList<LatLngData>(), routeId) {
+    // AQUI SE PONE LAS COORDENADAS PARA HCER EL RECORRIDO
+    val coordenadasRuta by produceState(initialValue = emptyList<LatLngData>(), routeId) {
         value = if (routeId != null) db.recorridoDao().getCoordenadasPorRuta(routeId)
         else emptyList()
         println("🟢 Ruta $routeId tiene ${value.size} puntos de recorrido")
-    }*/
-    var polilineaDecodificada = emptyList<LatLng>()
-
-    if (routeId != null){
-        val polilineaRuta = db.rutaDao().getPolilineaById(routeId)
-        polilineaDecodificada = decodePolyline(polilineaRuta)
     }
 
     // ✅ Evita crash al obtener la ruta desde OSRM
-    /*val polylinePoints by produceState(initialValue = emptyList<LatLng>(), ) {
-        if (polilineaDecodificada.isNotEmpty()) {
-            val puntos = polilineaDecodificada.map { LatLng(it.latitud, it.longitud) }
+    val polylinePoints by produceState(initialValue = emptyList<LatLng>(), coordenadasRuta) {
+        if (coordenadasRuta.isNotEmpty()) {
+            val puntos = coordenadasRuta.map { LatLng(it.latitud, it.longitud) }
             try {
                 // Ejecuta en hilo de IO (seguro)
                 value = withContext(kotlinx.coroutines.Dispatchers.IO) {
@@ -102,14 +96,10 @@ fun MyMapComponent(db: AppDatabase, routeId: Int?) {
                 value = emptyList()
             }
         } else value = emptyList()
-    }*/
+    }
 
     val rutaSeleccionada by produceState(initialValue = null as com.example.vamonosrecio.model.RutaModel?, routeId) {
         value = routeId?.let { db.rutaDao().getRutaById(it) }
-    }
-
-    val horarioSeleccionado by produceState(initialValue = null as HorarioModel?, routeId) {
-        value = routeId?.let { db.horarioDao().getHorarioByRutaId(it) }
     }
 
     val cameraPositionState = rememberCameraPositionState {
@@ -146,7 +136,7 @@ fun MyMapComponent(db: AppDatabase, routeId: Int?) {
     )
 
     var mostrarPopup by remember { mutableStateOf(routeId != null) }
-    val mostrarPolyline = mostrarPopup && polilineaDecodificada.isNotEmpty()
+    val mostrarPolyline = mostrarPopup && polylinePoints.isNotEmpty()
 
     Box(modifier = Modifier.fillMaxSize()) {
         GoogleMap(
@@ -180,18 +170,21 @@ fun MyMapComponent(db: AppDatabase, routeId: Int?) {
 
             // ✅ Ahora la polyline usa OSRM y no crashea
             if (mostrarPolyline) {
+                val rutaColor = getRutaColor(routeId ?: 0)
+                val selectedColor = rutaColor.copy(alpha = 1f)
+                val normalColor = rutaColor.copy(alpha = 0.6f)
+
                 Polyline(
-                    points = polilineaDecodificada,
-                    color = Color(0xFF00796B),
-                    width = 7f
+                    points = polylinePoints,
+                    color = if (mostrarPopup) selectedColor else normalColor,
+                    width = if (mostrarPopup) 10f else 6f
                 )
             }
         }
 
-        if (mostrarPopup && rutaSeleccionada != null && horarioSeleccionado != null) {
+        if (mostrarPopup && rutaSeleccionada != null) {
             RutaInfoPopup(
                 ruta = rutaSeleccionada!!,
-                horario = horarioSeleccionado!!,
                 onClose = { mostrarPopup = false }
             )
         }
@@ -239,9 +232,9 @@ fun CustomTopBar(onMenuClick: () -> Unit) {
                 )
             )
 
-            IconButton(onClick = { /* acción secundaria */ }) {
+            /*IconButton(onClick = { /* acción secundaria */ }) {
                 Icon(Icons.Default.MoreVert, contentDescription = "Opciones")
-            }
+            }*/
         }
     }
 }
@@ -298,7 +291,7 @@ fun CustomBottomNavBar() {
 
 // --- POPUP INFO DE RUTA ---
 @Composable
-fun RutaInfoPopup(ruta: com.example.vamonosrecio.model.RutaModel, horario: com.example.vamonosrecio.model.HorarioModel , onClose: () -> Unit) {
+fun RutaInfoPopup(ruta: com.example.vamonosrecio.model.RutaModel, onClose: () -> Unit) {
     var expandido by remember { mutableStateOf(true) }
 
     Box(
@@ -320,7 +313,7 @@ fun RutaInfoPopup(ruta: com.example.vamonosrecio.model.RutaModel, horario: com.e
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = "El trayecto de la *${ruta.nombre}* se muestra en el mapa.",
+                        text = "El trayecto de la ${ruta.nombre} se muestra en el mapa.",
                         fontWeight = FontWeight.Bold
                     )
                     Row {
@@ -338,8 +331,8 @@ fun RutaInfoPopup(ruta: com.example.vamonosrecio.model.RutaModel, horario: com.e
 
                 if (expandido) {
                     Spacer(Modifier.height(8.dp))
-                    Text("Horario: ${horario.horario?.ifEmpty { "6:00am - 9:30pm" }}")
-                    Text("Tiempo de espera aproximado: ${horario.tiempoEspera ?: 15} min")
+                    Text("Horario: ${ruta.horario?.ifEmpty { "6:00am - 9:30pm" }}")
+                    Text("Tiempo de espera aproximado: ${ruta.tiempoEstimadoEspera?.ifEmpty { "15 min" }}")
                 }
             }
         }

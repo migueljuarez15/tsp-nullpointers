@@ -6,9 +6,9 @@ import com.example.vamonosrecio.model.ParadaModel
 
 @Dao
 interface ParadaDao {
-    @Query("SELECT * FROM Paradas")
+    @Query("SELECT * FROM PARADAS")
     suspend fun getAllParadas(): List<ParadaModel>
 
-    @Query("SELECT * FROM Paradas WHERE id_parada IN (:ids)")
-    suspend fun getParadasByIds(ids: List<Int>): List<ParadaModel> // De momento no se usa en ninguna parte
+    @Query("SELECT * FROM PARADAS WHERE ID_PARADA IN (:ids)")
+    suspend fun getParadasByIds(ids: List<Int>): List<ParadaModel>
 }

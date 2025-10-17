@@ -6,12 +6,9 @@ import com.example.vamonosrecio.model.RutaModel
 
 @Dao
 interface RutaDao {
-    @Query("SELECT * FROM Rutas")
+    @Query("SELECT * FROM RUTA")
     suspend fun getAllRutas(): List<RutaModel>
 
-    @Query("SELECT * FROM Rutas WHERE idRuta = :rutaId")
+    @Query("SELECT * FROM RUTA WHERE ID_RUTA = :rutaId")
     suspend fun getRutaById(rutaId: Int): RutaModel
-
-    @Query("SELECT polilinea FROM Rutas WHERE idRuta = :rutaId")
-    fun getPolilineaById(rutaId: Int): String
 }
