@@ -10,7 +10,7 @@ import com.example.vamonosrecio.model.dao.ParadaDao
 import com.example.vamonosrecio.model.dao.RutaDao
 
 
-@Database(entities = [RutaModel::class, ParadaModel::class, HorarioModel::class], version = 7, exportSchema = false)
+@Database(entities = [RutaModel::class, ParadaModel::class, HorarioModel::class], version = 8, exportSchema = true)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun rutaDao(): RutaDao
     abstract fun paradaDao(): ParadaDao

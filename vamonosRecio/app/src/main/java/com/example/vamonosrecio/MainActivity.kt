@@ -19,7 +19,7 @@ class MainActivity : ComponentActivity() {
             "vamonosRecio.db"
         )
             .createFromAsset("databases/vamonosRecio.db")
-            .fallbackToDestructiveMigration() // fuerza recreación si hay conflicto
+            //.fallbackToDestructiveMigration() // fuerza recreación si hay conflicto
             .build()
     }
 
