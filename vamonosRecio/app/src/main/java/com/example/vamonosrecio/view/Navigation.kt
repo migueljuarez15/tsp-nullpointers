@@ -10,7 +10,7 @@ import com.example.vamonosrecio.db.AppDatabase
 sealed class Screen(val route: String) {
     object Main : Screen("main_screen")
     object RouteList : Screen("route_list_screen")
-    // object RouteDetail : Screen("route_detail_screen/{routeId}") // Ejemplo para futura pantalla de detalle
+    object Busqueda : Screen("busqueda_screen")
 }
 
 @Composable
@@ -25,7 +25,9 @@ fun AppNavigation(db: AppDatabase) {
             MainScreen(
                 db = db,
                 routeId = routeId,
-                onMenuClick = { navController.navigate(Screen.RouteList.route) }
+                onMenuClick = { navController.navigate(Screen.RouteList.route) },
+                onSearchClick = { navController.navigate(Screen.Busqueda.route) },
+                navController = navController // 👈 necesario para recibir la ubicación seleccionada
             )
         }
 
@@ -38,6 +40,11 @@ fun AppNavigation(db: AppDatabase) {
                     navController.navigate("${Screen.Main.route}?routeId=${ruta.id}")
                 }
             )
+        }
+
+        // Nueva pantalla de búsqueda
+        composable(Screen.Busqueda.route) {
+            BusquedaView(navController = navController)
         }
     }
 }

@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController
 import com.example.vamonosrecio.db.AppDatabase
 import com.example.vamonosrecio.model.ParadaModel
 import com.example.vamonosrecio.model.LatLngData
@@ -42,9 +43,9 @@ data class BottomNavItem(
 
 // --- MAIN SCREEN ---
 @Composable
-fun MainScreen(db: AppDatabase, onMenuClick: () -> Unit, routeId: Int? = null) {
+fun MainScreen(db: AppDatabase, onMenuClick: () -> Unit, onSearchClick: () -> Unit, navController: NavController, routeId: Int? = null) {
     Scaffold(
-        topBar = { CustomTopBar(onMenuClick = onMenuClick) },
+        topBar = { CustomTopBar(onMenuClick = onMenuClick, navController = navController) },
         bottomBar = { CustomBottomNavBar() },
         floatingActionButtonPosition = FabPosition.Center
     ) { padding ->
@@ -53,7 +54,7 @@ fun MainScreen(db: AppDatabase, onMenuClick: () -> Unit, routeId: Int? = null) {
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            MyMapComponent(db, routeId)
+            MyMapComponent(db, routeId, navController)
         }
     }
 }
@@ -61,7 +62,7 @@ fun MainScreen(db: AppDatabase, onMenuClick: () -> Unit, routeId: Int? = null) {
 // --- GOOGLE MAP COMPONENT ---
 @SuppressLint("MissingPermission")
 @Composable
-fun MyMapComponent(db: AppDatabase, routeId: Int?) {
+fun MyMapComponent(db: AppDatabase, routeId: Int?, navController: androidx.navigation.NavController) {
     val context = LocalContext.current
     val fusedLocationProviderClient = remember { LocationServices.getFusedLocationProviderClient(context) }
 
@@ -104,6 +105,24 @@ fun MyMapComponent(db: AppDatabase, routeId: Int?) {
 
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(zacatecas, 13f)
+    }
+
+    // 🔵 Estado para guardar el marcador del lugar buscado
+    var selectedMarker by remember { mutableStateOf<LatLng?>(null) }
+
+    // 🔄 Escucha la ubicación seleccionada desde la pantalla de búsqueda
+    val selectedPlaceFlow = navController.currentBackStackEntry
+        ?.savedStateHandle
+        ?.getStateFlow<LatLng?>("selectedPlace", null)
+
+    val selectedPlace by selectedPlaceFlow?.collectAsState(initial = null) ?: remember { mutableStateOf(null) }
+
+    LaunchedEffect(selectedPlace) {
+        selectedPlace?.let {
+            selectedMarker = it
+            println("📍 Centrar cámara en: ${it.latitude}, ${it.longitude}")
+            cameraPositionState.animate(CameraUpdateFactory.newLatLngZoom(it, 15f))
+        }
     }
 
     val locationPermissionLauncher = rememberLauncherForActivityResult(
@@ -180,6 +199,15 @@ fun MyMapComponent(db: AppDatabase, routeId: Int?) {
                     width = if (mostrarPopup) 10f else 6f
                 )
             }
+
+            // ✅ Marker del lugar buscado
+            selectedMarker?.let {
+                Marker(
+                    state = rememberMarkerState(position = it),
+                    title = "Destino seleccionado",
+                    snippet = "Ubicación buscada"
+                )
+            }
         }
 
         if (mostrarPopup && rutaSeleccionada != null) {
@@ -194,7 +222,7 @@ fun MyMapComponent(db: AppDatabase, routeId: Int?) {
 // --- CUSTOM TOP BAR ---
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CustomTopBar(onMenuClick: () -> Unit) {
+fun CustomTopBar(onMenuClick: () -> Unit, navController: NavController) {
     Surface(
         color = MaterialTheme.colorScheme.background,
         tonalElevation = 2.dp,
@@ -216,13 +244,13 @@ fun CustomTopBar(onMenuClick: () -> Unit) {
             TextField(
                 value = searchText,
                 onValueChange = { searchText = it },
-                placeholder = { Text("Buscar") },
-                shape = CircleShape,
+                placeholder = { Text("Buscar destino") },
                 modifier = Modifier
                     .weight(1f)
                     .height(48.dp)
-                    .padding(horizontal = 8.dp),
-                singleLine = true,
+                    .padding(horizontal = 8.dp)
+                    .clickable { navController.navigate(Screen.Busqueda.route) },
+                enabled = false, // desactiva edición directa
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Buscar") },
                 colors = TextFieldDefaults.colors(
                     unfocusedContainerColor = Color(0xFFE2E8F0),
@@ -231,10 +259,6 @@ fun CustomTopBar(onMenuClick: () -> Unit) {
                     focusedIndicatorColor = Color.Transparent
                 )
             )
-
-            /*IconButton(onClick = { /* acción secundaria */ }) {
-                Icon(Icons.Default.MoreVert, contentDescription = "Opciones")
-            }*/
         }
     }
 }
