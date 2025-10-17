@@ -8,6 +8,7 @@ import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.vamonosrecio.db.AppDatabase
 import com.example.vamonosrecio.view.AppNavigation
+import com.google.android.libraries.places.api.Places
 import java.util.concurrent.Executors
 
 class MainActivity : ComponentActivity() {
@@ -25,6 +26,12 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // ✅ Inicializa Google Places una sola vez
+        if (!Places.isInitialized()) {
+            Places.initialize(applicationContext, "AIzaSyDkcaTrFPn2PafDX85VmT-XEKS2qnk7oe8")
+        }
+
         setContent {
             AppNavigation(db)
         }
