@@ -10,5 +10,5 @@ interface ParadaDao {
     suspend fun getAllParadas(): List<ParadaModel>
 
     @Query("SELECT * FROM PARADAS WHERE ID_PARADA IN (:ids)")
-    suspend fun getParadasByIds(ids: List<Int>): List<ParadaModel>
+    suspend fun getParadasByIds(ids: List<Int>): List<ParadaModel> // De momento no se usa en ninguna parte
 }
