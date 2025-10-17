@@ -20,9 +20,15 @@ import androidx.room.Index
             childColumns = ["ID_PARADA"]
         )
     ],
-    indices = [Index(value = ["ID_RUTA"]), Index(value = ["ID_PARADA"])] // <-- ÍNDICES AÑADIDOS
+    indices = [Index(value = ["ID_RUTA"]), Index(value = ["ID_PARADA"])]
 )
 data class RecorridoModel(
     @ColumnInfo(name = "ID_RUTA") val rutaId: Int,
-    @ColumnInfo(name = "ID_PARADA") val paradaId: Int
+    @ColumnInfo(name = "ID_PARADA") val paradaId: Int,
+    @ColumnInfo(name = "ORDEN") val orden: Int // 👈 nuevo campo
+)
+
+data class LatLngData(
+    @ColumnInfo(name = "LATITUD") val latitud: Double,
+    @ColumnInfo(name = "LONGITUD") val longitud: Double,
 )

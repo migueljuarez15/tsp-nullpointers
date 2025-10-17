@@ -15,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -22,13 +23,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.vamonosrecio.db.AppDatabase
 import com.example.vamonosrecio.model.ParadaModel
+import com.example.vamonosrecio.model.LatLngData
+import com.example.vamonosrecio.utils.fetchRouteWithOSRM
 import com.google.android.gms.location.LocationServices
-import com.google.android.gms.maps.model.BitmapDescriptorFactory
+import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
-import com.google.maps.android.compose.*
-import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.LatLngBounds
+import com.google.maps.android.compose.*
+import kotlinx.coroutines.withContext
 
 // --- DATA CLASS ---
 data class BottomNavItem(
@@ -61,41 +64,58 @@ fun MyMapComponent(db: AppDatabase, routeId: Int?) {
     val context = LocalContext.current
     val fusedLocationProviderClient = remember { LocationServices.getFusedLocationProviderClient(context) }
 
-    // 📍 Coordenadas por defecto (Zacatecas - Guadalupe)
     val zacatecas = LatLng(22.7709, -102.5833)
     var deviceLocation by remember { mutableStateOf<LatLng?>(null) }
 
-    // Cargar paradas desde la BD
     val paradas by produceState(initialValue = emptyList<ParadaModel>()) {
         value = db.paradaDao().getAllParadas()
-        println("🔹 Se cargaron ${value.size} paradas desde la base de datos")
+        println("🔵 Se cargaron ${value.size} paradas")
     }
 
-    // Estado de la cámara
+    // AQUI SE PONE LAS COORDENADAS PARA HCER EL RECORRIDO
+    val coordenadasRuta by produceState(initialValue = emptyList<LatLngData>(), routeId) {
+        value = if (routeId != null) db.recorridoDao().getCoordenadasPorRuta(routeId)
+        else emptyList()
+        println("🟢 Ruta $routeId tiene ${value.size} puntos de recorrido")
+    }
+
+    // ✅ Evita crash al obtener la ruta desde OSRM
+    val polylinePoints by produceState(initialValue = emptyList<LatLng>(), coordenadasRuta) {
+        if (coordenadasRuta.isNotEmpty()) {
+            val puntos = coordenadasRuta.map { LatLng(it.latitud, it.longitud) }
+            try {
+                // Ejecuta en hilo de IO (seguro)
+                value = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    fetchRouteWithOSRM(puntos)
+                }
+                println("🟣 Polyline generada con ${value.size} puntos decodificados")
+            } catch (e: Exception) {
+                e.printStackTrace()
+                println("❌ Error al generar polyline: ${e.message}")
+                value = emptyList()
+            }
+        } else value = emptyList()
+    }
+
+    val rutaSeleccionada by produceState(initialValue = null as com.example.vamonosrecio.model.RutaModel?, routeId) {
+        value = routeId?.let { db.rutaDao().getRutaById(it) }
+    }
+
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(zacatecas, 13f)
     }
 
-    // 🚨 Permisos de ubicación
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         if (permissions.getOrDefault(Manifest.permission.ACCESS_FINE_LOCATION, false)) {
             fusedLocationProviderClient.lastLocation
                 .addOnSuccessListener { location ->
-                    deviceLocation = if (location != null) {
-                        LatLng(location.latitude, location.longitude)
-                    } else zacatecas
+                    deviceLocation = location?.let { LatLng(it.latitude, it.longitude) } ?: zacatecas
                 }
-                .addOnFailureListener {
-                    deviceLocation = zacatecas
-                }
-        } else {
-            deviceLocation = zacatecas
-        }
+        } else deviceLocation = zacatecas
     }
 
-    // Lanzar permisos una vez
     LaunchedEffect(Unit) {
         locationPermissionLauncher.launch(
             arrayOf(
@@ -105,56 +125,63 @@ fun MyMapComponent(db: AppDatabase, routeId: Int?) {
         )
     }
 
-    // Centrar cámara inicial
     LaunchedEffect(deviceLocation) {
-        cameraPositionState.animate(
-            CameraUpdateFactory.newLatLngZoom(deviceLocation ?: zacatecas, 13f)
-        )
+        cameraPositionState.animate(CameraUpdateFactory.newLatLngZoom(deviceLocation ?: zacatecas, 13f))
     }
 
-    // 📐 Limitar área visible del mapa (Zacatecas - Guadalupe)
     val zacatecasBounds = LatLngBounds(
-        LatLng(22.6000, -102.8000), // suroeste — un poco más abajo y a la izquierda
-        LatLng(22.9000, -102.4000)  // noreste — un poco más arriba y a la derecha
+        LatLng(22.5500, -102.9500),
+        LatLng(23.0000, -102.3000)
     )
 
-    // --- Mapa ---
-    GoogleMap(
-        modifier = Modifier.fillMaxSize(),
-        cameraPositionState = cameraPositionState,
-        properties = MapProperties(
-            isMyLocationEnabled = deviceLocation != null,
-            latLngBoundsForCameraTarget = zacatecasBounds,
-            minZoomPreference = 12f,
-            maxZoomPreference = 18f
-        )
-    ) {
-        // 📍 Ubicación del usuario
-        deviceLocation?.let {
-            Marker(
-                state = MarkerState(it),
-                title = "Mi ubicación"
+    var mostrarPopup by remember { mutableStateOf(routeId != null) }
+    val mostrarPolyline = mostrarPopup && polylinePoints.isNotEmpty()
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        GoogleMap(
+            modifier = Modifier.fillMaxSize(),
+            cameraPositionState = cameraPositionState,
+            properties = MapProperties(
+                isMyLocationEnabled = deviceLocation != null,
+                latLngBoundsForCameraTarget = zacatecasBounds,
+                minZoomPreference = 11f,
+                maxZoomPreference = 18f
             )
-        }
+        ) {
+            val zoom = cameraPositionState.position.zoom
+            val step = when {
+                zoom > 17 -> 1
+                zoom > 15 -> 3
+                zoom > 13 -> 6
+                else -> 0
+            }
 
-        // 🔵 Dibujar círculos de paradas según el nivel de zoom
-        val zoom = cameraPositionState.position.zoom
-        val step = when {
-            zoom > 17 -> 1
-            zoom > 15 -> 3
-            zoom > 13 -> 6
-            else -> 0 // No se muestran puntos si el zoom es bajo
-        }
+            if (step > 0) {
+                paradas.filterIndexed { index, _ -> index % step == 0 }.forEach { parada ->
+                    Circle(
+                        center = LatLng(parada.latitud, parada.longitud),
+                        radius = 10.0,
+                        strokeColor = Color(0xFF1565C0),
+                        fillColor = Color(0x441565C0)
+                    )
+                }
+            }
 
-        if (step > 0) {
-            paradas.filterIndexed { index, _ -> index % step == 0 }.forEach { parada ->
-                Circle(
-                    center = LatLng(parada.latitud, parada.longitud),
-                    radius = 10.0,
-                    strokeColor = Color(0xFF1565C0),
-                    fillColor = Color(0x441565C0)
+            // ✅ Ahora la polyline usa OSRM y no crashea
+            if (mostrarPolyline) {
+                Polyline(
+                    points = polylinePoints,
+                    color = Color(0xFF00796B),
+                    width = 7f
                 )
             }
+        }
+
+        if (mostrarPopup && rutaSeleccionada != null) {
+            RutaInfoPopup(
+                ruta = rutaSeleccionada!!,
+                onClose = { mostrarPopup = false }
+            )
         }
     }
 }
@@ -171,11 +198,11 @@ fun CustomTopBar(onMenuClick: () -> Unit) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .statusBarsPadding() // 👈 añade espacio superior
+                .statusBarsPadding()
                 .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onMenuClick) { // Se usa el parámetro onMenuClick
+            IconButton(onClick = onMenuClick) {
                 Icon(Icons.Default.Menu, contentDescription = "Menú")
             }
 
@@ -191,9 +218,7 @@ fun CustomTopBar(onMenuClick: () -> Unit) {
                     .height(48.dp)
                     .padding(horizontal = 8.dp),
                 singleLine = true,
-                leadingIcon = {
-                    Icon(Icons.Default.Search, contentDescription = "Buscar")
-                },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Buscar") },
                 colors = TextFieldDefaults.colors(
                     unfocusedContainerColor = Color(0xFFE2E8F0),
                     focusedContainerColor = Color(0xFFE2E8F0),
@@ -208,29 +233,6 @@ fun CustomTopBar(onMenuClick: () -> Unit) {
         }
     }
 }
-
-// --- FLOATING BUTTON (CENTRAL) ---
-/*@Composable
-fun CenterFloatingButton() {
-    Surface(
-        modifier = Modifier
-            .size(56.dp),
-        shape = CircleShape,
-        color = Color(0xFFE2E8F0).copy(alpha = 0.9f),
-        shadowElevation = 8.dp
-    ) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.KeyboardArrowUp,
-                contentDescription = "Expandir",
-                tint = Color(0xFF475569)
-            )
-        }
-    }
-}*/
 
 // --- CUSTOM BOTTOM NAV BAR ---
 @Composable
@@ -250,7 +252,7 @@ fun CustomBottomNavBar() {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .navigationBarsPadding() // 👈 añade espacio inferior
+                .navigationBarsPadding()
                 .padding(bottom = 6.dp),
             horizontalArrangement = Arrangement.SpaceAround,
             verticalAlignment = Alignment.CenterVertically
@@ -276,6 +278,56 @@ fun CustomBottomNavBar() {
                         else Color(0xFF475569),
                         style = MaterialTheme.typography.labelSmall
                     )
+                }
+            }
+        }
+    }
+}
+
+// --- POPUP INFO DE RUTA ---
+@Composable
+fun RutaInfoPopup(ruta: com.example.vamonosrecio.model.RutaModel, onClose: () -> Unit) {
+    var expandido by remember { mutableStateOf(true) }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        contentAlignment = Alignment.BottomCenter // 👈 lo fija abajo
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .shadow(8.dp, RoundedCornerShape(12.dp)),
+            colors = CardDefaults.cardColors(containerColor = Color.White)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "El trayecto de la *${ruta.nombre}* se muestra en el mapa.",
+                        fontWeight = FontWeight.Bold
+                    )
+                    Row {
+                        IconButton(onClick = { expandido = !expandido }) {
+                            Icon(
+                                imageVector = if (expandido) Icons.Default.ExpandMore else Icons.Default.ExpandLess,
+                                contentDescription = null
+                            )
+                        }
+                        IconButton(onClick = onClose) {
+                            Icon(Icons.Default.Close, contentDescription = "Cerrar")
+                        }
+                    }
+                }
+
+                if (expandido) {
+                    Spacer(Modifier.height(8.dp))
+                    Text("Horario: ${ruta.horario?.ifEmpty { "6:00am - 9:30pm" }}")
+                    Text("Tiempo de espera aproximado: ${ruta.tiempoEstimadoEspera?.ifEmpty { "15 min" }}")
                 }
             }
         }

@@ -18,13 +18,14 @@ fun AppNavigation(db: AppDatabase) {
     val navController = rememberNavController()
 
     NavHost(navController = navController, startDestination = Screen.Main.route) {
+
         // Pantalla principal con el mapa
-        composable(Screen.Main.route) {
+        composable("${Screen.Main.route}?routeId={routeId}") { backStackEntry ->
+            val routeId = backStackEntry.arguments?.getString("routeId")?.toIntOrNull()
             MainScreen(
                 db = db,
-                onMenuClick = {
-                    navController.navigate(Screen.RouteList.route)
-                }
+                routeId = routeId,
+                onMenuClick = { navController.navigate(Screen.RouteList.route) }
             )
         }
 
@@ -34,8 +35,7 @@ fun AppNavigation(db: AppDatabase) {
                 db = db,
                 onBack = { navController.popBackStack() },
                 onRouteClick = { ruta ->
-                    // Aquí irá la lógica para navegar al detalle de la ruta
-                    // Por ahora, lo dejamos vacío
+                    navController.navigate("${Screen.Main.route}?routeId=${ruta.id}")
                 }
             )
         }

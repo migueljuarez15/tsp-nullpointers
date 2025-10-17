@@ -79,6 +79,11 @@ dependencies {
 
     implementation("com.google.android.gms:play-services-maps:18.1.0")
 
+    implementation("com.google.maps.android:maps-utils-ktx:5.1.1")
+
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("org.json:json:20210307")
+
     //Conexion con la base de datos
     val room_version = "2.6.1"
     implementation("androidx.room:room-runtime:$room_version")
