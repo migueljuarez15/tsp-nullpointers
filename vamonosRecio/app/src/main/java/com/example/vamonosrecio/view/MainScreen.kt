@@ -2,8 +2,10 @@ package com.example.vamonosrecio.view
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.graphics.BitmapFactory
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -17,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -236,7 +239,21 @@ fun CustomTopBar(onMenuClick: () -> Unit, navController: NavController) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onMenuClick) {
-                Icon(Icons.Default.Menu, contentDescription = "Menú")
+                val context = LocalContext.current
+                val bitmap = remember("icons/rutasCamion.png") {
+                    try {
+                        context.assets.open("icons/rutasCamion.png").use { BitmapFactory.decodeStream(it) }
+                    } catch (e: java.io.IOException) {
+                        e.printStackTrace()
+                        null
+                    }
+                }
+                bitmap?.let {
+                    Image(
+                        bitmap = it.asImageBitmap(),
+                        contentDescription = "Menú"
+                    )
+                }
             }
 
             var searchText by remember { mutableStateOf("") }
