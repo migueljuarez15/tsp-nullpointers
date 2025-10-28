@@ -2,6 +2,7 @@ package com.example.vamonosrecio.view
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -32,6 +33,7 @@ import com.example.vamonosrecio.utils.fetchRouteWithOSRM
 import com.example.vamonosrecio.utils.getRutaColor
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.LatLngBounds
@@ -171,21 +173,51 @@ fun MyMapComponent(db: AppDatabase, routeId: Int?, navController: androidx.navig
                 maxZoomPreference = 18f
             )
         ) {
+            // --- ZOOM ACTUAL ---
             val zoom = cameraPositionState.position.zoom
-            val step = when {
-                zoom > 17 -> 1
-                zoom > 15 -> 3
-                zoom > 13 -> 6
-                else -> 0
+
+            // --- PARADAS CACHÉ ---
+            val paradasMemo = remember(paradas) { paradas }
+
+            // --- PARADA SELECCIONADA ---
+            var paradaSeleccionada by remember { mutableStateOf<ParadaModel?>(null) }
+
+            // --- CARGAR Y ESCALAR ÍCONO SOLO UNA VEZ ---
+            val context = LocalContext.current
+            val paradaBitmap = remember {
+                try {
+                    context.assets.open("icons/paradaCamion.png").use {
+                        BitmapFactory.decodeStream(it)
+                    }?.let { Bitmap.createScaledBitmap(it, 80, 80, false) }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    null
+                }
             }
 
-            if (step > 0) {
-                paradas.filterIndexed { index, _ -> index % step == 0 }.forEach { parada ->
-                    Circle(
-                        center = LatLng(parada.latitud, parada.longitud),
-                        radius = 10.0,
-                        strokeColor = Color(0xFF1565C0),
-                        fillColor = Color(0x441565C0)
+            if (zoom < 16f) {
+                // 👇 Versión ligera con Círculos (más fluida)
+                paradasMemo.forEachIndexed { index, parada ->
+                    if (index % 3 == 0) { // dibuja 1 de cada 3 para optimizar
+                        Circle(
+                            center = LatLng(parada.latitud, parada.longitud),
+                            radius = 12.0,
+                            strokeColor = Color(0xFF1565C0),
+                            fillColor = Color(0x441565C0)
+                        )
+                    }
+                }
+            } else if (paradaBitmap != null) {
+                // 👇 Versión detallada con íconos clicables
+                paradasMemo.forEach { parada ->
+                    Marker(
+                        state = MarkerState(position = LatLng(parada.latitud, parada.longitud)),
+                        title = parada.nombre,
+                        icon = BitmapDescriptorFactory.fromBitmap(paradaBitmap),
+                        onClick = {
+                            paradaSeleccionada = parada
+                            true
+                        }
                     )
                 }
             }
